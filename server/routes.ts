@@ -247,14 +247,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User profile routes
   app.get("/api/user/profile", async (req, res) => {
     try {
-      // For demo purposes, return a default user profile
-      const defaultUser = {
-        firstName: "Sarah",
-        lastName: "Johnson",
-        email: "sarah@company.com",
-        role: "Brand Manager",
-      };
-      res.json(defaultUser);
+      const userProfile = await storage.getUserProfile();
+      res.json(userProfile);
     } catch (error) {
       console.error("Error fetching user profile:", error);
       res.status(500).json({ message: "Failed to fetch user profile" });
@@ -270,13 +264,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "First name, last name, and email are required" });
       }
       
-      // For demo purposes, just return the updated data
-      const updatedUser = {
+      const updatedUser = await storage.updateUserProfile({
         firstName,
         lastName,
         email,
-        role: role || "Brand Manager",
-      };
+        role,
+      });
       
       res.json(updatedUser);
     } catch (error) {

@@ -17,6 +17,8 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getUserProfile(): Promise<{firstName: string; lastName: string; email: string; role: string}>;
+  updateUserProfile(profile: {firstName: string; lastName: string; email: string; role?: string}): Promise<{firstName: string; lastName: string; email: string; role: string}>;
   getInfluencers(filters?: {
     category?: string;
     minFollowers?: number;
@@ -55,6 +57,12 @@ export class MemoryStorage implements IStorage {
   private campaigns: Campaign[] = [];
   private collaborations: Collaboration[] = [];
   private analytics: Analytics[] = [];
+  private userProfile = {
+    firstName: "Sarah",
+    lastName: "Johnson", 
+    email: "sarah@company.com",
+    role: "Brand Manager"
+  };
   private nextId = 1;
   private isSeeded = false;
 
@@ -81,6 +89,20 @@ export class MemoryStorage implements IStorage {
     };
     this.users.push(user);
     return user;
+  }
+
+  async getUserProfile(): Promise<{firstName: string; lastName: string; email: string; role: string}> {
+    return this.userProfile;
+  }
+
+  async updateUserProfile(profile: {firstName: string; lastName: string; email: string; role?: string}): Promise<{firstName: string; lastName: string; email: string; role: string}> {
+    this.userProfile = {
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: profile.email,
+      role: profile.role || this.userProfile.role
+    };
+    return this.userProfile;
   }
 
   async getInfluencers(filters?: {
