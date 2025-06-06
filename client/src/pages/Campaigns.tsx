@@ -21,6 +21,8 @@ export default function Campaigns() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignWithCollaborations | null>(null);
 
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ["/api/campaigns", { status: statusFilter }],
@@ -92,10 +94,8 @@ export default function Campaigns() {
   };
 
   const handleViewCampaign = (campaign: CampaignWithCollaborations) => {
-    toast({
-      title: "View Campaign",
-      description: `Viewing details for ${campaign.name}`,
-    });
+    setSelectedCampaign(campaign);
+    setIsViewDialogOpen(true);
   };
 
   const handleEditCampaign = (campaign: CampaignWithCollaborations) => {
@@ -402,6 +402,165 @@ export default function Campaigns() {
           </div>
         </div>
       </div>
+
+      {/* Campaign Details Modal */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedCampaign?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedCampaign && (
+            <div className="space-y-6">
+              {/* Campaign Overview */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Status</label>
+                    <div className="mt-1">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedCampaign.status === "active" ? "bg-green-100 text-green-800" :
+                        selectedCampaign.status === "completed" ? "bg-blue-100 text-blue-800" :
+                        selectedCampaign.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                        "bg-gray-100 text-gray-800"
+                      }`}>
+                        {selectedCampaign.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Category</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedCampaign.category}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Description</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedCampaign.description || "No description provided"}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Budget</label>
+                    <p className="mt-1 text-sm text-gray-900">${selectedCampaign.budget}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Created By</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedCampaign.creator?.firstName} {selectedCampaign.creator?.lastName}</p>
+                  </div>
+                </div>
+
+                {selectedCampaign.targetAudience && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Target Audience</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedCampaign.targetAudience}</p>
+                  </div>
+                )}
+
+                {selectedCampaign.goals && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Campaign Goals</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedCampaign.goals}</p>
+                  </div>
+                )}
+
+                {(selectedCampaign.startDate || selectedCampaign.endDate) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedCampaign.startDate && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Start Date</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {new Date(selectedCampaign.startDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    {selectedCampaign.endDate && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">End Date</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {new Date(selectedCampaign.endDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Performance Metrics */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Metrics</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">{selectedCampaign.collaborations.length}</p>
+                    <p className="text-xs text-gray-500">Collaborations</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {selectedCampaign.collaborations.reduce((sum, col) => sum + (col.actualReach || 0), 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">Total Reach</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {selectedCampaign.collaborations.length > 0 
+                        ? (selectedCampaign.collaborations.reduce((sum, col) => sum + parseFloat(col.actualEngagement || "0"), 0) / selectedCampaign.collaborations.length).toFixed(1) + "%"
+                        : "-"
+                      }
+                    </p>
+                    <p className="text-xs text-gray-500">Avg Engagement</p>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-2xl font-bold text-gray-900">285%</p>
+                    <p className="text-xs text-gray-500">ROI</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Collaborations */}
+              {selectedCampaign.collaborations.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Collaborations</h3>
+                  <div className="space-y-3">
+                    {selectedCampaign.collaborations.map((collaboration) => (
+                      <div key={collaboration.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={collaboration.influencer.profileImageUrl || "/api/placeholder/40/40"}
+                            alt={collaboration.influencer.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                          <div>
+                            <p className="font-medium text-gray-900">{collaboration.influencer.name}</p>
+                            <p className="text-sm text-gray-500">{collaboration.influencer.handle}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            collaboration.status === "completed" ? "bg-green-100 text-green-800" :
+                            collaboration.status === "active" ? "bg-blue-100 text-blue-800" :
+                            collaboration.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                            "bg-gray-100 text-gray-800"
+                          }`}>
+                            {collaboration.status}
+                          </span>
+                          {collaboration.agreedRate && (
+                            <p className="text-sm text-gray-500 mt-1">${collaboration.agreedRate}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button onClick={() => setIsViewDialogOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
