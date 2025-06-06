@@ -35,17 +35,22 @@ export default function Dashboard() {
     },
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<{
+    activeCampaigns: number;
+    totalReach: number;
+    avgEngagementRate: number;
+    totalROI: number;
+  }>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: campaigns, isLoading: campaignsLoading } = useQuery({
+  const { data: campaigns, isLoading: campaignsLoading } = useQuery<CampaignWithCollaborations[]>({
     queryKey: ["/api/campaigns"],
   });
 
   // Seed data on component mount if no campaigns exist
   useEffect(() => {
-    if (campaigns?.length === 0) {
+    if (campaigns && campaigns.length === 0) {
       seedData();
     }
   }, [campaigns, seedData]);
