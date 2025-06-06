@@ -229,6 +229,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User profile routes
+  app.get("/api/user/profile", async (req, res) => {
+    try {
+      // For demo purposes, return a default user profile
+      const defaultUser = {
+        firstName: "Sarah",
+        lastName: "Johnson",
+        email: "sarah@company.com",
+        role: "Brand Manager",
+      };
+      res.json(defaultUser);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ message: "Failed to fetch user profile" });
+    }
+  });
+
+  app.put("/api/user/profile", async (req, res) => {
+    try {
+      const { firstName, lastName, email, role } = req.body;
+      
+      // Validate required fields
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({ message: "First name, last name, and email are required" });
+      }
+      
+      // For demo purposes, just return the updated data
+      const updatedUser = {
+        firstName,
+        lastName,
+        email,
+        role: role || "Brand Manager",
+      };
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update user profile" });
+    }
+  });
+
+  app.put("/api/user/password", async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      // Validate required fields
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+      
+      // For demo purposes, simulate password validation
+      if (currentPassword === "wrongpassword") {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Error updating password:", error);
+      res.status(500).json({ message: "Failed to update password" });
+    }
+  });
+
+  app.put("/api/user/notifications", async (req, res) => {
+    try {
+      const notifications = req.body;
+      
+      // For demo purposes, just return success
+      res.json({ message: "Notification preferences updated successfully", notifications });
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
