@@ -7,6 +7,7 @@ import { NavigationProvider } from "@/hooks/useNavigationStore";
 import Dashboard from "@/pages/Dashboard";
 import InfluencerDiscovery from "@/pages/InfluencerDiscovery";
 import Campaigns from "@/pages/Campaigns";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/influencers" component={InfluencerDiscovery} />
       <Route path="/campaigns" component={Campaigns} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
