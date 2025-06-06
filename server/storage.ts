@@ -1,9 +1,4 @@
 import {
-  users,
-  influencers,
-  campaigns,
-  collaborations,
-  analytics,
   type User,
   type InsertUser,
   type Influencer,
@@ -17,8 +12,6 @@ import {
   type CampaignWithCollaborations,
   type InfluencerWithStats,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, like, and, gte, lte, sql, asc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -67,19 +60,36 @@ export interface IStorage {
   seedData(): Promise<void>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class MemoryStorage implements IStorage {
+  private users: User[] = [];
+  private influencers: Influencer[] = [];
+  private campaigns: Campaign[] = [];
+  private collaborations: Collaboration[] = [];
+  private analytics: Analytics[] = [];
+  private nextId = 1;
+
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return this.users.find(user => user.id === id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    return this.users.find(user => user.username === username);
   }
 
   async createUser(userData: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(userData).returning();
+    const user: User = {
+      id: this.nextId++,
+      username: userData.username,
+      email: userData.email || null,
+      password: userData.password,
+      role: userData.role || "Brand Manager",
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.push(user);
     return user;
   }
 
@@ -89,205 +99,209 @@ export class DatabaseStorage implements IStorage {
     maxFollowers?: number;
     search?: string;
   }): Promise<InfluencerWithStats[]> {
-    let query = db.select().from(influencers);
-    
-    const conditions = [];
+    let filteredInfluencers = [...this.influencers];
     
     if (filters?.category && filters.category !== "All Categories") {
-      conditions.push(eq(influencers.category, filters.category));
+      filteredInfluencers = filteredInfluencers.filter(inf => inf.category === filters.category);
     }
     
     if (filters?.minFollowers) {
-      conditions.push(gte(influencers.followers, filters.minFollowers));
+      filteredInfluencers = filteredInfluencers.filter(inf => inf.followers >= filters.minFollowers!);
     }
     
     if (filters?.maxFollowers) {
-      conditions.push(lte(influencers.followers, filters.maxFollowers));
+      filteredInfluencers = filteredInfluencers.filter(inf => inf.followers <= filters.maxFollowers!);
     }
     
     if (filters?.search) {
-      conditions.push(
-        sql`(${influencers.name} ILIKE ${`%${filters.search}%`} OR ${influencers.handle} ILIKE ${`%${filters.search}%`})`
+      const searchLower = filters.search.toLowerCase();
+      filteredInfluencers = filteredInfluencers.filter(inf => 
+        inf.name.toLowerCase().includes(searchLower) || 
+        inf.handle.toLowerCase().includes(searchLower)
       );
     }
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-    
-    const result = await query.orderBy(desc(influencers.followers));
-    return result;
+    return filteredInfluencers.sort((a, b) => b.followers - a.followers);
   }
 
   async getInfluencer(id: number): Promise<Influencer | undefined> {
-    const [influencer] = await db.select().from(influencers).where(eq(influencers.id, id));
-    return influencer;
+    return this.influencers.find(inf => inf.id === id);
   }
 
   async createInfluencer(influencerData: InsertInfluencer): Promise<Influencer> {
-    const [influencer] = await db.insert(influencers).values(influencerData).returning();
+    const influencer: Influencer = {
+      id: this.nextId++,
+      name: influencerData.name,
+      handle: influencerData.handle,
+      email: influencerData.email || null,
+      category: influencerData.category,
+      followers: influencerData.followers,
+      engagementRate: influencerData.engagementRate,
+      ratePerPost: influencerData.ratePerPost,
+      profileImageUrl: influencerData.profileImageUrl || null,
+      bio: influencerData.bio || null,
+      isVerified: influencerData.isVerified || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.influencers.push(influencer);
     return influencer;
   }
 
   async updateInfluencer(id: number, updates: Partial<InsertInfluencer>): Promise<Influencer> {
-    const [influencer] = await db
-      .update(influencers)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(influencers.id, id))
-      .returning();
-    return influencer;
+    const index = this.influencers.findIndex(inf => inf.id === id);
+    if (index === -1) throw new Error("Influencer not found");
+    
+    this.influencers[index] = {
+      ...this.influencers[index],
+      ...updates,
+      updatedAt: new Date(),
+    };
+    return this.influencers[index];
   }
 
   async deleteInfluencer(id: number): Promise<void> {
-    await db.delete(influencers).where(eq(influencers.id, id));
+    const index = this.influencers.findIndex(inf => inf.id === id);
+    if (index !== -1) {
+      this.influencers.splice(index, 1);
+    }
   }
 
   async getCampaigns(userId?: number, status?: string): Promise<CampaignWithCollaborations[]> {
-    let query = db
-      .select()
-      .from(campaigns)
-      .leftJoin(users, eq(campaigns.createdBy, users.id));
-    
-    const conditions = [];
+    let filteredCampaigns = [...this.campaigns];
     
     if (userId) {
-      conditions.push(eq(campaigns.createdBy, userId));
+      filteredCampaigns = filteredCampaigns.filter(camp => camp.createdBy === userId);
     }
     
     if (status && status !== "all") {
-      conditions.push(eq(campaigns.status, status));
+      filteredCampaigns = filteredCampaigns.filter(camp => camp.status === status);
     }
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-    
-    const campaignsData = await query.orderBy(desc(campaigns.createdAt));
-    
-    // Get collaborations for each campaign
-    const campaignsWithCollaborations: CampaignWithCollaborations[] = [];
-    
-    for (const row of campaignsData) {
-      const collaborationsData = await db
-        .select()
-        .from(collaborations)
-        .leftJoin(influencers, eq(collaborations.influencerId, influencers.id))
-        .where(eq(collaborations.campaignId, row.campaigns.id));
+    return filteredCampaigns.map(campaign => {
+      const creator = this.users.find(user => user.id === campaign.createdBy)!;
+      const campaignCollaborations = this.collaborations
+        .filter(col => col.campaignId === campaign.id)
+        .map(col => ({
+          ...col,
+          influencer: this.influencers.find(inf => inf.id === col.influencerId)!,
+        }));
       
-      campaignsWithCollaborations.push({
-        ...row.campaigns,
-        creator: row.users!,
-        collaborations: collaborationsData.map(colRow => ({
-          ...colRow.collaborations,
-          influencer: colRow.influencers!,
-        })),
-      });
-    }
-    
-    return campaignsWithCollaborations;
+      return {
+        ...campaign,
+        creator,
+        collaborations: campaignCollaborations,
+      };
+    }).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
   }
 
   async getCampaign(id: number): Promise<CampaignWithCollaborations | undefined> {
-    const [campaignData] = await db
-      .select()
-      .from(campaigns)
-      .leftJoin(users, eq(campaigns.createdBy, users.id))
-      .where(eq(campaigns.id, id));
+    const campaign = this.campaigns.find(camp => camp.id === id);
+    if (!campaign) return undefined;
     
-    if (!campaignData) return undefined;
-    
-    const collaborationsData = await db
-      .select()
-      .from(collaborations)
-      .leftJoin(influencers, eq(collaborations.influencerId, influencers.id))
-      .where(eq(collaborations.campaignId, id));
+    const creator = this.users.find(user => user.id === campaign.createdBy)!;
+    const campaignCollaborations = this.collaborations
+      .filter(col => col.campaignId === campaign.id)
+      .map(col => ({
+        ...col,
+        influencer: this.influencers.find(inf => inf.id === col.influencerId)!,
+      }));
     
     return {
-      ...campaignData.campaigns,
-      creator: campaignData.users!,
-      collaborations: collaborationsData.map(colRow => ({
-        ...colRow.collaborations,
-        influencer: colRow.influencers!,
-      })),
+      ...campaign,
+      creator,
+      collaborations: campaignCollaborations,
     };
   }
 
   async createCampaign(campaignData: InsertCampaign): Promise<Campaign> {
-    const [campaign] = await db.insert(campaigns).values(campaignData).returning();
+    const campaign: Campaign = {
+      id: this.nextId++,
+      ...campaignData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.campaigns.push(campaign);
     return campaign;
   }
 
   async updateCampaign(id: number, updates: Partial<InsertCampaign>): Promise<Campaign> {
-    const [campaign] = await db
-      .update(campaigns)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(campaigns.id, id))
-      .returning();
-    return campaign;
+    const index = this.campaigns.findIndex(camp => camp.id === id);
+    if (index === -1) throw new Error("Campaign not found");
+    
+    this.campaigns[index] = {
+      ...this.campaigns[index],
+      ...updates,
+      updatedAt: new Date(),
+    };
+    return this.campaigns[index];
   }
 
   async deleteCampaign(id: number): Promise<void> {
-    await db.delete(campaigns).where(eq(campaigns.id, id));
+    const index = this.campaigns.findIndex(camp => camp.id === id);
+    if (index !== -1) {
+      this.campaigns.splice(index, 1);
+    }
   }
 
   async getCollaborations(campaignId?: number, influencerId?: number): Promise<(Collaboration & {
     campaign: Campaign;
     influencer: Influencer;
   })[]> {
-    let query = db
-      .select()
-      .from(collaborations)
-      .leftJoin(campaigns, eq(collaborations.campaignId, campaigns.id))
-      .leftJoin(influencers, eq(collaborations.influencerId, influencers.id));
-    
-    const conditions = [];
+    let filteredCollaborations = [...this.collaborations];
     
     if (campaignId) {
-      conditions.push(eq(collaborations.campaignId, campaignId));
+      filteredCollaborations = filteredCollaborations.filter(col => col.campaignId === campaignId);
     }
     
     if (influencerId) {
-      conditions.push(eq(collaborations.influencerId, influencerId));
+      filteredCollaborations = filteredCollaborations.filter(col => col.influencerId === influencerId);
     }
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-    
-    const result = await query.orderBy(desc(collaborations.createdAt));
-    
-    return result.map(row => ({
-      ...row.collaborations,
-      campaign: row.campaigns!,
-      influencer: row.influencers!,
-    }));
+    return filteredCollaborations.map(col => ({
+      ...col,
+      campaign: this.campaigns.find(camp => camp.id === col.campaignId)!,
+      influencer: this.influencers.find(inf => inf.id === col.influencerId)!,
+    })).sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
   }
 
   async createCollaboration(collaborationData: InsertCollaboration): Promise<Collaboration> {
-    const [collaboration] = await db.insert(collaborations).values(collaborationData).returning();
+    const collaboration: Collaboration = {
+      id: this.nextId++,
+      ...collaborationData,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.collaborations.push(collaboration);
     return collaboration;
   }
 
   async updateCollaboration(id: number, updates: Partial<InsertCollaboration>): Promise<Collaboration> {
-    const [collaboration] = await db
-      .update(collaborations)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(collaborations.id, id))
-      .returning();
-    return collaboration;
+    const index = this.collaborations.findIndex(col => col.id === id);
+    if (index === -1) throw new Error("Collaboration not found");
+    
+    this.collaborations[index] = {
+      ...this.collaborations[index],
+      ...updates,
+      updatedAt: new Date(),
+    };
+    return this.collaborations[index];
   }
 
   async getAnalytics(campaignId: number): Promise<Analytics[]> {
-    return await db
-      .select()
-      .from(analytics)
-      .where(eq(analytics.campaignId, campaignId))
-      .orderBy(asc(analytics.date));
+    return this.analytics
+      .filter(analytics => analytics.campaignId === campaignId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }
 
   async createAnalytics(analyticsData: InsertAnalytics): Promise<Analytics> {
-    const [analyticsRecord] = await db.insert(analytics).values(analyticsData).returning();
-    return analyticsRecord;
+    const analytics: Analytics = {
+      id: this.nextId++,
+      ...analyticsData,
+      createdAt: new Date(),
+    };
+    this.analytics.push(analytics);
+    return analytics;
   }
 
   async getDashboardStats(userId?: number): Promise<{
@@ -296,57 +310,45 @@ export class DatabaseStorage implements IStorage {
     avgEngagementRate: number;
     totalROI: number;
   }> {
-    // Get active campaigns count
-    const activeCampaignsQuery = db
-      .select({ count: sql<number>`count(*)` })
-      .from(campaigns)
-      .where(eq(campaigns.status, "active"));
-    
+    let campaigns = this.campaigns;
     if (userId) {
-      activeCampaignsQuery.where(eq(campaigns.createdBy, userId));
+      campaigns = campaigns.filter(camp => camp.createdBy === userId);
     }
     
-    const [activeCampaignsResult] = await activeCampaignsQuery;
+    const activeCampaigns = campaigns.filter(camp => camp.status === "active").length;
     
-    // Calculate total reach and engagement from collaborations
-    const collaborationsQuery = db
-      .select({
-        totalReach: sql<number>`COALESCE(SUM(${collaborations.actualReach}), 0)`,
-        avgEngagement: sql<number>`COALESCE(AVG(${collaborations.actualEngagement}), 0)`,
-      })
-      .from(collaborations)
-      .leftJoin(campaigns, eq(collaborations.campaignId, campaigns.id))
-      .where(eq(collaborations.status, "completed"));
+    const completedCollaborations = this.collaborations.filter(col => 
+      col.status === "completed" && 
+      (!userId || campaigns.some(camp => camp.id === col.campaignId))
+    );
     
-    if (userId) {
-      collaborationsQuery.where(eq(campaigns.createdBy, userId));
-    }
-    
-    const [collaborationsResult] = await collaborationsQuery;
+    const totalReach = completedCollaborations.reduce((sum, col) => sum + (col.actualReach || 0), 0);
+    const avgEngagementRate = completedCollaborations.length > 0
+      ? completedCollaborations.reduce((sum, col) => sum + (parseFloat(col.actualEngagement || "0")), 0) / completedCollaborations.length
+      : 0;
     
     return {
-      activeCampaigns: activeCampaignsResult.count,
-      totalReach: collaborationsResult.totalReach || 0,
-      avgEngagementRate: Number(collaborationsResult.avgEngagement) || 0,
-      totalROI: 325, // Placeholder ROI calculation
+      activeCampaigns,
+      totalReach,
+      avgEngagementRate,
+      totalROI: 325, // Sample ROI
     };
   }
 
   async seedData(): Promise<void> {
     // Check if data already exists
-    const existingInfluencers = await db.select().from(influencers).limit(1);
-    if (existingInfluencers.length > 0) return;
+    if (this.influencers.length > 0) return;
 
     // Create sample user
-    const [sampleUser] = await db.insert(users).values({
+    const sampleUser = await this.createUser({
       username: "admin",
       email: "admin@influencehub.com",
-      password: "password", // In production, this should be hashed
+      password: "password",
       role: "Brand Manager",
       firstName: "Sarah",
       lastName: "Johnson",
       profileImageUrl: "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150",
-    }).returning();
+    });
 
     // Seed influencers
     const influencerData = [
@@ -424,7 +426,11 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
-    const createdInfluencers = await db.insert(influencers).values(influencerData).returning();
+    const createdInfluencers = [];
+    for (const influencer of influencerData) {
+      const created = await this.createInfluencer(influencer);
+      createdInfluencers.push(created);
+    }
 
     // Seed campaigns
     const campaignData = [
@@ -466,7 +472,11 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
-    const createdCampaigns = await db.insert(campaigns).values(campaignData).returning();
+    const createdCampaigns = [];
+    for (const campaign of campaignData) {
+      const created = await this.createCampaign(campaign);
+      createdCampaigns.push(created);
+    }
 
     // Seed collaborations
     const collaborationData = [
@@ -486,21 +496,26 @@ export class DatabaseStorage implements IStorage {
         status: "pending",
         agreedRate: "400",
         deliverables: "1 YouTube review, 2 Instagram posts",
+        actualReach: null,
+        actualEngagement: null,
+        completedAt: null,
       },
       {
         campaignId: createdCampaigns[2].id,
         influencerId: createdInfluencers[2].id,
         status: "completed",
         agreedRate: "350",
-        deliverables: "1 workout video, 3 Instagram posts",
+        deliverables: "3 workout videos, 5 Instagram posts",
         actualReach: 320000,
         actualEngagement: "6.1",
         completedAt: new Date("2024-05-25"),
       },
     ];
 
-    await db.insert(collaborations).values(collaborationData);
+    for (const collaboration of collaborationData) {
+      await this.createCollaboration(collaboration);
+    }
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemoryStorage();

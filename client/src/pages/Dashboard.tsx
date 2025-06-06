@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import MobileHeader from "@/components/layout/MobileHeader";
 import KPICard from "@/components/dashboard/KPICard";
@@ -42,7 +44,6 @@ export default function Dashboard() {
   });
 
   // Seed data on component mount if no campaigns exist
-  const { useEffect } = await import("react");
   useEffect(() => {
     if (campaigns?.length === 0) {
       seedData();
