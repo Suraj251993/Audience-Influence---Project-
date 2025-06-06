@@ -47,6 +47,30 @@ export default function MobileHeader() {
                       Campaigns
                     </a>
                   </Link>
+                  <Link href="/collaborations">
+                    <a
+                      className="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Collaborations
+                    </a>
+                  </Link>
+                  <Link href="/analytics">
+                    <a
+                      className="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Analytics
+                    </a>
+                  </Link>
+                  <Link href="/settings">
+                    <a
+                      className="block px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Settings
+                    </a>
+                  </Link>
                 </nav>
               </div>
             </SheetContent>
