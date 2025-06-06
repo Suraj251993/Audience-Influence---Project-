@@ -16,12 +16,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { insertCampaignSchema, type CampaignWithCollaborations, type InsertCampaign } from "@shared/schema";
+import { z } from "zod";
+
+const campaignFormSchema = insertCampaignSchema.extend({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
 
 export default function Campaigns() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignWithCollaborations | null>(null);
 
   const { data: campaigns, isLoading } = useQuery({
@@ -85,6 +92,53 @@ export default function Campaigns() {
     },
   });
 
+  const updateCampaignMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCampaign> }) => {
+      const response = await fetch(`/api/campaigns/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update campaign");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      setIsEditDialogOpen(false);
+      editForm.reset();
+      toast({
+        title: "Campaign Updated",
+        description: "Your campaign has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const editForm = useForm<InsertCampaign>({
+    resolver: zodResolver(insertCampaignSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      category: "",
+      budget: "",
+      status: "pending",
+      targetAudience: "",
+      goals: "",
+      createdBy: 1,
+    },
+  });
+
   const handleCreateCampaign = () => {
     setIsCreateDialogOpen(true);
   };
@@ -99,10 +153,24 @@ export default function Campaigns() {
   };
 
   const handleEditCampaign = (campaign: CampaignWithCollaborations) => {
-    toast({
-      title: "Edit Campaign",
-      description: `Edit form for ${campaign.name} would open here.`,
+    setSelectedCampaign(campaign);
+    editForm.reset({
+      name: campaign.name,
+      description: campaign.description || "",
+      category: campaign.category,
+      budget: campaign.budget,
+      status: campaign.status,
+      targetAudience: campaign.targetAudience || "",
+      goals: campaign.goals || "",
+      createdBy: campaign.createdBy,
     });
+    setIsEditDialogOpen(true);
+  };
+
+  const onEditSubmit = (data: InsertCampaign) => {
+    if (selectedCampaign) {
+      updateCampaignMutation.mutate({ id: selectedCampaign.id, data });
+    }
   };
 
   const getStatusCounts = () => {
@@ -559,6 +627,164 @@ export default function Campaigns() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Campaign Modal */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Campaign</DialogTitle>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Campaign Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter campaign name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="fashion">Fashion</SelectItem>
+                          <SelectItem value="beauty">Beauty</SelectItem>
+                          <SelectItem value="tech">Technology</SelectItem>
+                          <SelectItem value="food">Food & Beverage</SelectItem>
+                          <SelectItem value="travel">Travel</SelectItem>
+                          <SelectItem value="fitness">Fitness</SelectItem>
+                          <SelectItem value="lifestyle">Lifestyle</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe your campaign goals and requirements"
+                        className="min-h-[100px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="budget"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Budget</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., 10000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="targetAudience"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Audience</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Women 18-35 interested in fashion" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="goals"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Campaign Goals</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe what you want to achieve with this campaign"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end space-x-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateCampaignMutation.isPending}
+                >
+                  {updateCampaignMutation.isPending ? "Updating..." : "Update Campaign"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

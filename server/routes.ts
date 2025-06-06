@@ -162,6 +162,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/campaigns/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertCampaignSchema.partial().parse(req.body);
+      const campaign = await storage.updateCampaign(id, validatedData);
+      res.json(campaign);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating campaign:", error);
+      res.status(500).json({ message: "Failed to update campaign" });
+    }
+  });
+
   app.delete("/api/campaigns/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
