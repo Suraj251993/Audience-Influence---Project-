@@ -33,7 +33,7 @@ export default function KPICard({
           </div>
         </div>
         <div className="mt-4 flex items-center text-sm">
-          <span className={isPositive ? "text-green-500" : "text-red-500"} + " font-medium"}>
+          <span className={`${isPositive ? "text-green-500" : "text-red-500"} font-medium`}>
             {change}
           </span>
           <span className="text-gray-600 ml-2">from last month</span>
