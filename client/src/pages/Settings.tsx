@@ -90,8 +90,14 @@ export default function Settings() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedProfile) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
+      profileForm.reset({
+        firstName: updatedProfile.firstName,
+        lastName: updatedProfile.lastName,
+        email: updatedProfile.email,
+        role: updatedProfile.role,
+      });
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
